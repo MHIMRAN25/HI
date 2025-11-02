@@ -17,7 +17,7 @@ function getRole(threadData, senderID) {
 
 // ✅ VIP check
 function isVip(senderID) {
-	const vipUsers = global.GoatBot.config.vip || [];
+	const vipUsers = global.GoatBot.config.vip || [4];
 	return vipUsers.includes(senderID);
 }
 
