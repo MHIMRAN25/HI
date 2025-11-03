@@ -5,7 +5,7 @@ const vipUserSchema = new mongoose.Schema({
   addedAt: { type: Date, required: true },
   expiresAt: { type: Date, required: true }
 });
-const vipModel = mongoose.models.vipUsers || mongoose.model("vipUsers", vipUserSchema);
+const vipModel = require("./path/to/vipModel"); // path ta tumi save kora vip.js/cmd model er path
 
 module.exports = {
   config: {
