@@ -8,15 +8,16 @@ function getType(obj) {
 }
 
 function getRole(threadData, senderID) {
-    const adminBot = global.GoatBot.config.adminBot || [];
-    if (!senderID) return 0;
+	const adminBot = global.GoatBot.config.adminBot || [];
+	if (!senderID) return 0;
 
-    const adminBox = threadData ? threadData.adminIDs || [] : [];
+	const adminBox = threadData ? threadData.adminIDs || [] : [];
+	const isVipUser = global.GoatBot.config.vip?.includes(senderID);
 
-    if (adminBot.includes(senderID)) return 2; // Bot admin
-    if (adminBox.includes(senderID)) return 1; // Thread admin
-    if (isVip(senderID)) return 4; // VIP
-    return 0; // Normal user
+	if (adminBot.includes(senderID)) return 2;   // Admin bot
+	if (adminBox.includes(senderID)) return 1;   // Admin group/thread
+	if (isVipUser) return 4;                     // VIP role
+	return 0;                                    // Normal user
 }
 // ✅ VIP check
 function isVip(senderID) {
