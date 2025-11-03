@@ -7,17 +7,22 @@ function getType(obj) {
 	return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
-function getRole(threadData, senderID) {
-	const adminBot = global.GoatBot.config.adminBot || [];
-	if (!senderID) return 0;
+async function getRole(threadData, senderID) {
+    const adminBot = global.GoatBot.config.adminBot || [];
+    if (!senderID) return 0;
 
-	const adminBox = threadData ? threadData.adminIDs || [] : [];
-	const isVipUser = global.GoatBot.config.vip?.includes(senderID);
+    const adminBox = threadData ? threadData.adminIDs || [] : [];
 
-	if (adminBot.includes(senderID)) return 2;   // Admin bot
-	if (adminBox.includes(senderID)) return 1;   // Admin group/thread
-	if (isVipUser) return 4;                     // VIP role
-	return 0;                                    // Normal user
+    let isVip = false;
+    try {
+        const vip = await vipModel.findOne({ uid: senderID });
+        if (vip && vip.expiresAt > new Date()) isVip = true;
+    } catch (e) {}
+
+    if (adminBot.includes(senderID)) return 2;   // Admin bot
+    if (adminBox.includes(senderID)) return 1;   // Admin thread
+    if (isVip) return 4;                         // VIP
+    return 0;                                    // Normal user
 }
 // ✅ VIP check
 function isVip(senderID) {
