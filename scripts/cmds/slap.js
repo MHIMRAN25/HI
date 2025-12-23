@@ -1,11 +1,12 @@
 const DIG = require("discord-image-generation");
 const fs = require("fs-extra");
 const path = require("path");
+const axios = require("axios");
 
 module.exports = {
   config: {
     name: "slap",
-    version: "3.4",
+    version: "3.5",
     author: "Saif",
     countDown: 5,
     role: 0,
@@ -20,8 +21,7 @@ module.exports = {
   langs: {
     en: {
       noTarget: "You must tag, reply, or use random to choose someone 😼",
-      activating: "👊 𝐀𝐜𝐭𝐢𝐯𝐚𝐭𝐢𝐧𝐠 𝐑𝐚𝐧𝐝𝐨𝐦 𝐒𝐥𝐚𝐩 𝐌𝐨𝐝𝐞...",
-      done: "boom  😵‍💫😵",
+      activating: "👊 Activating random slap mode...",
       lowBalance: "🌸 Senpai… you need **500 coins** to slap! 💰 Your balance: "
     }
   },
@@ -29,111 +29,115 @@ module.exports = {
   onStart: async function ({ event, message, usersData, args, getLang, api }) {
     try {
       const COST = 500;
-      const uid1 = event.senderID;
-      const botApi = global.api || api || message.api;
+      const senderID = event.senderID;
 
-      // load user safely
-      let user = (await usersData.get(uid1)) || { money: 0 };
+      /* ===== Balance check ===== */
+      const user = (await usersData.get(senderID)) || { money: 0 };
       if (user.money < COST)
         return message.reply(`${getLang("lowBalance")}${user.money} coins`);
 
-      // determine target first (tag / reply / random)
-      let uid2 = null;
+      /* ===== Target detection ===== */
+      let targetID = null;
       const content = args.join(" ").trim();
 
-      // --- Reply mode ---
+      // Reply
       if (event.messageReply?.senderID) {
-        uid2 = event.messageReply.senderID;
+        targetID = event.messageReply.senderID;
       }
-      // --- Mention mode ---
+      // Mention
       else if (Object.keys(event.mentions || {}).length > 0) {
-        uid2 = Object.keys(event.mentions)[0];
+        targetID = Object.keys(event.mentions)[0];
       }
-      // --- Random mode ---
+      // Random
       else if (/^(r|rnd|random|rndm)$/i.test(content)) {
-        // show activating message and wait
         await message.reply(getLang("activating"));
 
-        // get api object
-        if (!botApi) return message.reply("⚠️ Bot API not available for random mode.");
-
-        // fetch thread info safely
-        let info = {};
+        let info;
         try {
-          info = await botApi.getThreadInfo(event.threadID);
-        } catch (err) {
-          console.log("getThreadInfo failed:", err);
-          return message.reply("Nyaa~ I can't read group members here. Make sure bot has permission.");
+          info = await api.getThreadInfo(event.threadID);
+        } catch {
+          return message.reply("⚠️ Cannot read group members here.");
         }
 
-        const members = (info.participantIDs || []).filter(id => id !== uid1 && id !== (botApi.getCurrentUserID ? botApi.getCurrentUserID() : null));
-        if (!members.length) return message.reply("Nyaa~ No one available to slap!");
+        const members = (info.participantIDs || []).filter(
+          id => id !== senderID && id !== api.getCurrentUserID()
+        );
+        if (!members.length)
+          return message.reply("Nyaa~ No one available to slap!");
 
-        // pick random
-        uid2 = members[Math.floor(Math.random() * members.length)];
+        targetID = members[Math.floor(Math.random() * members.length)];
       }
 
-      if (!uid2) return message.reply(getLang("noTarget"));
-      if (uid2 === uid1) return message.reply("Ara ara… you can't slap yourself! baka~ (>///<)");
+      if (!targetID) return message.reply(getLang("noTarget"));
+      if (targetID === senderID)
+        return message.reply("Ara ara… you can't slap yourself! baka~ (>///<)");
 
-      // At this point target is confirmed — deduct coins
-      await usersData.set(uid1, { ...user, money: user.money - COST });
+      /* ===== Deduct coins AFTER target confirmed ===== */
+      await usersData.set(senderID, { ...user, money: user.money - COST });
       const remaining = user.money - COST;
 
-      // Ensure tmp folder exists
+      /* ===== Prepare tmp folder ===== */
       const tmpDir = path.join(__dirname, "tmp");
       if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
 
-      // Generate image safely (with fallbacks)
-      let avatarURL1 = "";
-      let avatarURL2 = "";
-      try { avatarURL1 = (await usersData.getAvatarUrl(uid1)) || ""; } catch (err) { console.log("avatar1 fetch failed:", err); }
-      try { avatarURL2 = (await usersData.getAvatarUrl(uid2)) || ""; } catch (err) { console.log("avatar2 fetch failed:", err); }
+      /* ===== Facebook avatar → BUFFER ===== */
+      let avatar1, avatar2;
+      try {
+        avatar1 = await getFbAvatarBuffer(senderID);
+        avatar2 = await getFbAvatarBuffer(targetID);
+      } catch (err) {
+        await usersData.set(senderID, { ...user, money: user.money }); // refund
+        return message.reply("❌ Failed to load avatars. Coins refunded.");
+      }
 
+      /* ===== Generate image ===== */
       let img;
       try {
-        img = await new DIG.Batslap().getImage(avatarURL1, avatarURL2);
+        img = await new DIG.Batslap().getImage(avatar1, avatar2);
       } catch (err) {
-        console.log("DIG.Batslap error:", err);
-        // refund user if generation fails
-        await usersData.set(uid1, { ...user, money: user.money }); // refund
-        return message.reply("Uwuuu~ Image generation failed, coins refunded. Try again later.");
+        await usersData.set(senderID, { ...user, money: user.money }); // refund
+        return message.reply("❌ Image generation failed. Coins refunded.");
       }
 
-      const pathSave = path.join(tmpDir, `${uid1}_${uid2}_Batslap.png`);
-      try {
-        fs.writeFileSync(pathSave, Buffer.from(img));
-      } catch (err) {
-        console.log("writeFileSync failed:", err);
-        await usersData.set(uid1, { ...user, money: user.money }); // refund
-        return message.reply("Uwuuu~ Could not save image, coins refunded. Try again later.");
-      }
+      const filePath = path.join(tmpDir, `${senderID}_${targetID}_batslap.png`);
+      fs.writeFileSync(filePath, Buffer.from(img));
 
-      // Anime-style replies
+      /* ===== Names ===== */
       let senderName = "Senpai";
       let targetName = "Baka";
-      try { senderName = (await usersData.getName(uid1)) || senderName; } catch {}
-      try { targetName = (await usersData.getName(uid2)) || targetName; } catch {}
+      try { senderName = await usersData.getName(senderID); } catch {}
+      try { targetName = await usersData.getName(targetID); } catch {}
 
+      /* ===== Sender-POV replies ===== */
       const animeReplies = [
-        `Nyaa~ ${senderName}-chan just slapped ${targetName}! ✨`,
-        `${targetName}-san got smacked by ${senderName}-kun 😼`,
-        `Baka! ${senderName} used BATSLLAP! ${targetName} is stunned! 💫`,
-        `Sugoi~ ${senderName}-chan’s slap hits ${targetName}! ⚡`
+        `Nyaa~ I just slapped ${targetName}! ✨`,
+        `Hehe~ I smashed ${targetName} with a batslap 😼`,
+        `Baka! I used BATSLAAP on ${targetName}! 💥`,
+        `Sugoi~ My slap landed perfectly on ${targetName}! ⚡`
       ];
-      const chosenReply = animeReplies[Math.floor(Math.random() * animeReplies.length)];
+      const reply = animeReplies[Math.floor(Math.random() * animeReplies.length)];
 
-      // send reply (reply to command message)
-      return message.reply({
-        body: `${chosenReply}\n💸 ${COST} coins deducted!\n💳 Remaining: ${remaining} coins`,
-        attachment: fs.createReadStream(pathSave)
-      }, () => {
-        try { fs.unlinkSync(pathSave); } catch (e) {}
-      });
+      /* ===== Send ===== */
+      return message.reply(
+        {
+          body: `${reply}\n💸 ${COST} coins deducted!\n💳 Remaining: ${remaining} coins`,
+          attachment: fs.createReadStream(filePath)
+        },
+        () => {
+          try { fs.unlinkSync(filePath); } catch {}
+        }
+      );
 
     } catch (err) {
-      console.log("SLAP COMMAND ERROR:", err);
+      console.error("SLAP COMMAND ERROR:", err);
       return message.reply("Uwuuu~ Something went wrong (>_<)💦");
     }
   }
 };
+
+/* ========= Helper ========= */
+async function getFbAvatarBuffer(uid) {
+  const url = `https://graph.facebook.com/${uid}/picture?height=1500&width=1500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+  const res = await axios.get(url, { responseType: "arraybuffer" });
+  return Buffer.from(res.data);
+}
