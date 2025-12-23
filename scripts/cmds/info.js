@@ -17,16 +17,16 @@ module.exports = {
 
   onStart: async function ({ message }) {
     const authorName = "SAIF";
-    const ownAge = "20+";
+    const ownAge = "21+";
     const messenger = "https://m.me/61567256940629";
     const authorFB = "https://www.facebook.com/61567256940629";
     const authorNumber = "01823772045";
     const status = "Broken";
 
     const urls = [
-      "https://files.catbox.moe/ree9su.mp4",
-      "https://files.catbox.moe/ree9su.mp4",
-      "https://files.catbox.moe/ree9su.mp4",
+      "https://i.imgur.com/YRGXJij.mp4",
+      "https://i.imgur.com/YRGXJij.mp4",
+      "https://i.imgur.com/YRGXJij.mp4",
       "https://files.catbox.moe/ree9su.mp4"
     ];
     const link = urls[Math.floor(Math.random() * urls.length)];
