@@ -1,6 +1,7 @@
 const DIG = require("discord-image-generation");
 const fs = require("fs-extra");
 const path = require("path");
+const axios = require("axios");
 
 // --- Unicode bold italic map ---
 const boldItalicMap = {
@@ -9,7 +10,7 @@ const boldItalicMap = {
   A:"𝘼",B:"𝘽",C:"𝘾",D:"𝘿",E:"𝙀",F:"𝙁",G:"𝙂",H:"𝙃",I:"𝙄",J:"𝙅",K:"𝙆",L:"𝙇",M:"𝙈",
   N:"𝙉",O:"𝙊",P:"𝙋",Q:"𝙌",R:"𝙍",S:"𝙎",T:"𝙏",U:"𝙐",V:"𝙑",W:"𝙒",X:"𝙓",Y:"𝙔",Z:"𝙕",
   "0":"𝟬","1":"𝟭","2":"𝟮","3":"𝟯","4":"𝟰","5":"𝟱","6":"𝟲","7":"𝟳","8":"𝟴","9":"𝟵","!":"❗","?":"❓",
-  ".":"﹒",",":"﹐","'":"’",'"':'”',":":"꞉",";":"；","-":"−","_":"＿","/":"／","\\":"＼","&":"＆","%":"％",
+  ".":"﹒",",":"﹐","'":"’","\"":'”',":":"꞉",";":"；","-":"−","_":"＿","/":"／","\\":"＼","&":"＆","%":"％",
   " ":" "
 };
 
@@ -17,27 +18,31 @@ function toBoldItalic(str){
   return str.split("").map(c => boldItalicMap[c] || c).join("");
 }
 
+// --- Helper: FB avatar buffer using access token ---
+async function getFbAvatarBuffer(uid) {
+  const url = `https://graph.facebook.com/${uid}/picture?height=1500&width=1500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+  const res = await axios.get(url, { responseType: "arraybuffer" });
+  return Buffer.from(res.data);
+}
+
 module.exports = {
   config: {
     name: "affect",
-    version: "1.6",
+    version: "2.0",
     author: "Saif",
-    countDown: 20,
+    countDown: 0,
     role: 0,
     shortDescription: "Affect image with anime style",
-    longDescription: "Affect image with coins and anime flavor",
+    longDescription: "Affect image with coins",
     category: "fun",
-    guide: {
-      vi: "{pn} [@tag | r | rnd | random]",
-      en: "{pn} [@tag | r | rnd | random]"
-    }
+    guide: "{pn} [@tag | r | rnd | random]"
   },
 
   onStart: async function({ event, message, usersData, api, args }) {
     const COST = 500;
     const senderID = event.senderID;
 
-    // ---- Check balance ----
+    // --- Check balance ---
     let user = await usersData.get(senderID);
     let balance = user.money || 0;
     if (balance < COST) return message.reply(toBoldItalic(`🌸 senpai… you need ${COST} coins!\n💰 your balance: ${balance} coins!`));
@@ -46,7 +51,7 @@ module.exports = {
     await usersData.set(senderID, { ...user, money: balance - COST });
     const remaining = balance - COST;
 
-    // ---- Determine target ----
+    // --- Determine target ---
     const mention = Object.keys(event.mentions);
     let targetID;
 
@@ -65,31 +70,22 @@ module.exports = {
 
     if (targetID === senderID) return message.reply(toBoldItalic("ara ara~ you can't affect yourself baka (>///<)"));
 
-    // ---- Names ----
+    // --- Names ---
     const senderInfo = await api.getUserInfo([senderID]);
     const nameSender = Object.values(senderInfo)[0].name;
 
     const targetInfo = await api.getUserInfo([targetID]);
     const nameTarget = Object.values(targetInfo)[0].name;
 
-    // ---- Countdown ----
-    let countdownMsg = await message.reply(toBoldItalic(`⏳ affecting ${nameTarget} in 3 seconds nyaaa`));
-    for (let i = 2; i > 0; i--) {
-      await new Promise(res => setTimeout(res, 1000));
-      await api.editMessage(toBoldItalic(`⏳ affecting ${nameTarget} in ${i} seconds nyaaa`), countdownMsg.messageID);
-    }
-    await new Promise(res => setTimeout(res, 1000));
-    await api.editMessage(toBoldItalic(`bby u are affected now… senpai noticed! ✨`), countdownMsg.messageID);
-
-    // ---- Generate image ----
-    const avatarURL = await usersData.getAvatarUrl(targetID);
+    // --- Generate image ---
+    const avatarURL = await getFbAvatarBuffer(targetID);
     const img = await new DIG.Affect().getImage(avatarURL);
     const tmpDir = path.join(__dirname, "tmp");
     fs.ensureDirSync(tmpDir);
     const pathSave = path.join(tmpDir, `${targetID}_Affect.png`);
     fs.writeFileSync(pathSave, Buffer.from(img));
 
-    // ---- Anime-style final message ----
+    // --- Anime-style final message ---
     const animeReplies = [
       `nyaa~ ${nameSender} affected ${nameTarget}!`,
       `baka! ${nameTarget}-san got affected by ${nameSender}-chan 💥`,
@@ -99,10 +95,12 @@ module.exports = {
     ];
     const chosenReply = toBoldItalic(animeReplies[Math.floor(Math.random() * animeReplies.length)]);
 
-    // ---- Send final message ----
-    await api.sendMessage({
+    // --- Send final message ---
+    await message.reply({
       body: `${chosenReply}\n\n${toBoldItalic(`💸 deducted: ${COST} coins!\n💳 remaining: ${remaining}`)}`,
       attachment: fs.createReadStream(pathSave)
-    }, event.threadID, () => fs.unlinkSync(pathSave));
+    });
+
+    fs.unlinkSync(pathSave);
   }
 };
