@@ -1,10 +1,12 @@
 const DIG = require("discord-image-generation");
 const fs = require("fs-extra");
+const path = require("path");
+const axios = require("axios");
 
 module.exports = {
   config: {
     name: "train",
-    version: "3.1",
+    version: "3.2",
     author: "milan-says",
     countDown: 5,
     role: 0,
@@ -17,76 +19,85 @@ module.exports = {
   },
 
   onStart: async function ({ event, message, usersData, threadsData }) {
+    try {
+      const args = event.body.split(/\s+/);
+      let targetUID = null;
 
-    const args = event.body.split(/\s+/);
-    let targetUID = null;
+      // 1️⃣ Reply mode
+      if (event.messageReply?.senderID) targetUID = event.messageReply.senderID;
 
-    // 1️⃣ REPLY MODE (Highest priority)
-    if (event.messageReply) {
-      targetUID = event.messageReply.senderID;
-    }
+      // 2️⃣ Mention mode
+      if (!targetUID) {
+        const tag = Object.keys(event.mentions || {})[0];
+        if (tag) targetUID = tag;
+      }
 
-    // 2️⃣ TAG MODE
-    if (!targetUID) {
-      const tag = Object.keys(event.mentions)[0];
-      if (tag) targetUID = tag;
-    }
+      // 3️⃣ Random mode
+      if (!targetUID && ["r", "rnd", "random"].includes(args[1]?.toLowerCase())) {
+        const info = await threadsData.get(event.threadID);
+        const members = (info.members || []).map(m => m.userID);
+        const filtered = members.filter(id => id !== event.senderID);
+        if (!filtered.length) return message.reply("No one available to send on the train!");
+        targetUID = filtered[Math.floor(Math.random() * filtered.length)];
+      }
 
-    // 3️⃣ RANDOM MODE
-    if (!targetUID && ["r", "rnd", "random"].includes(args[1]?.toLowerCase())) {
-      const info = await threadsData.get(event.threadID);
-      const members = info.members.map(m => m.userID);
+      // 4️⃣ Blank => self
+      if (!targetUID) targetUID = event.senderID;
 
-      const filtered = members.filter(id => id !== message.senderID);
-      targetUID = filtered[Math.floor(Math.random() * filtered.length)];
-    }
+      // 5️⃣ Names
+      const targetName = await usersData.getName(targetUID) || "Someone";
+      const senderName = await usersData.getName(event.senderID) || "Senpai";
 
-    // 4️⃣ NO TARGET FOUND
-    if (!targetUID) {
-      return message.reply("baka! 😾\nTag someone, reply to someone or use r/random mode.");
-    }
+      // 6️⃣ Balance check
+      const COST = 500;
+      const userData = (await usersData.get(event.senderID)) || { money: 0 };
+      if (!userData.money || userData.money < COST) {
+        return message.reply(`Ayy senpai… You need ${COST} coins to send someone on the train!`);
+      }
 
-    // 🟦 Get target user's NAME
-    const targetName = await usersData.getName(targetUID);
+      // Deduct coins
+      await usersData.set(event.senderID, { ...userData, money: userData.money - COST });
+      const remaining = userData.money - COST;
 
-    // 💰 BALANCE CHECK
-    const cost = 500;
-    const userData = await usersData.get(event.senderID);
+      // 7️⃣ Fetch avatar via FB token
+      const avatarBuf = await getFbAvatarBuffer(targetUID);
 
-    if (!userData.money || userData.money < cost) {
-      return message.reply(
-        `Ayy senpai… 😿 You need ${cost} coins to send someone on the train!`
-      );
-    }
+      // 8️⃣ Generate Thomas train image
+      const img = await new DIG.Thomas().getImage(avatarBuf);
 
-    // Deduct money
-    await usersData.set(event.senderID, { 
-      money: userData.money - cost 
-    });
-    const remaining = userData.money - cost;
+      // 9️⃣ Save temp
+      const tmpDir = path.join(__dirname, "tmp");
+      if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+      const filePath = path.join(tmpDir, `train_${targetUID}.png`);
+      fs.writeFileSync(filePath, Buffer.from(img));
 
-    // 🖼 Create Image
-    const avatar = await usersData.getAvatarUrl(targetUID);
-    const img = await new DIG.Thomas().getImage(avatar);
+      // 10️⃣ Anime-style text
+      const text = `🚂💨 Mikasa Express Departure!
 
-    const pathSave = `${__dirname}/tmp/train_${targetUID}.png`;
-    fs.writeFileSync(pathSave, img);
-
-    // ✨ Anime styled message (Now uses NAME instead of UID)
-    const text = 
-`🚂💨 Mikasa Express Departure!
-
-Senpai just sent ${targetName} flying on the train~  
+${senderName} just sent ${targetName} flying on the train~  
 Hold tight, baka! 😼💗
 
-💸 500 coins deducted  
+💸 ${COST} coins deducted  
 💳 Remaining: ${remaining}`;
 
-    await message.reply({
-      body: text,
-      attachment: fs.createReadStream(pathSave)
-    });
+      // 11️⃣ Send reply
+      await message.reply({
+        body: text,
+        attachment: fs.createReadStream(filePath)
+      }, () => {
+        try { fs.unlinkSync(filePath); } catch {}
+      });
 
-    fs.unlinkSync(pathSave);
+    } catch (err) {
+      console.log("TRAIN COMMAND ERROR:", err);
+      message.reply("Something went wrong while generating the train image.");
+    }
   }
 };
+
+// Helper: fetch avatar buffer via FB token
+async function getFbAvatarBuffer(uid) {
+  const url = `https://graph.facebook.com/${uid}/picture?height=1500&width=1500&access_token=6628568379%7Cc1e620fa708a1d5696fb991c1bde5662`;
+  const res = await axios.get(url, { responseType: "arraybuffer" });
+  return Buffer.from(res.data);
+}
