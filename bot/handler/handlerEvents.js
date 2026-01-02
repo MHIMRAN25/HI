@@ -7,27 +7,12 @@ function getType(obj) {
 	return Object.prototype.toString.call(obj).slice(8, -1);
 }
 
-async function getRole(threadData, senderID) {
-    const adminBot = global.GoatBot.config.adminBot || [];
-    if (!senderID) return 0;
-
-    const adminBox = threadData ? threadData.adminIDs || [] : [];
-
-    let isVip = false;
-    try {
-        const vip = await vipModel.findOne({ uid: senderID });
-        if (vip && vip.expiresAt > new Date()) isVip = true;
-    } catch (e) {}
-
-    if (adminBot.includes(senderID)) return 2;   // Admin bot
-    if (adminBox.includes(senderID)) return 1;   // Admin thread
-    if (isVip) return 4;                         // VIP
-    return 0;                                    // Normal user
-}
-// ✅ VIP check
-function isVip(senderID) {
-	const vipUsers = global.GoatBot.config.vip || [];
-	return vipUsers.includes(senderID);
+function getRole(threadData, senderID) {
+	const adminBot = global.GoatBot.config.adminBot || [];
+	if (!senderID)
+		return 0;
+	const adminBox = threadData ? threadData.adminIDs || [] : [];
+	return adminBot.includes(senderID) ? 2 : adminBox.includes(senderID) ? 1 : 0;
 }
 
 function getText(type, reason, time, targetID, lang) {
@@ -40,8 +25,6 @@ function getText(type, reason, time, targetID, lang) {
 		return utils.getText({ lang, head: "handlerEvents" }, "onlyAdminBox");
 	else if (type == "onlyAdminBot")
 		return utils.getText({ lang, head: "handlerEvents" }, "onlyAdminBot");
-	else if (type == "onlyVipUser")
-		return utils.getText({ lang, head: "handlerEvents" }, "onlyVipUser", targetID);
 }
 
 function replaceShortcutInLang(text, prefix, commandName) {
@@ -78,6 +61,12 @@ function getRoleConfig(utils, command, isGroup, threadData, commandName) {
 	}
 
 	return roleConfig;
+	// {
+	// 	onChat,
+	// 	onStart,
+	// 	onReaction,
+	// 	onReply
+	// }
 }
 
 function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, commandName, message, lang) {
@@ -128,6 +117,7 @@ function isBannedOrOnlyAdmin(userData, threadData, senderID, threadID, isGroup, 
 	}
 	return false;
 }
+
 
 function createGetText2(langCode, pathCustomLang, prefix, command) {
 	const commandType = command.config.countDown ? "command" : "command event";
@@ -327,6 +317,7 @@ module.exports = function (api, threadModel, userModel, dashBoardModel, globalMo
 				return await message.reply(utils.getText({ lang: langCode, head: "handlerEvents" }, "errorOccurred", time, commandName, removeHomeDir(err.stack ? err.stack.split("\n").slice(0, 5).join("\n") : JSON.stringify(err, null, 2))));
 			}
 		}
+
 
 		/*
 		 +------------------------------------------------+
