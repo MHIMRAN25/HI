@@ -1,84 +1,109 @@
 function formatMoney(amount) {
-	if (amount >= 1e15) return (amount / 1e15).toFixed(2) + "QT";
-	if (amount >= 1e12) return (amount / 1e12).toFixed(2) + "T";
-	if (amount >= 1e9) return (amount / 1e9).toFixed(2) + "B";
-	if (amount >= 1e6) return (amount / 1e6).toFixed(2) + "M";
-	if (amount >= 1e3) return (amount / 1e3).toFixed(2) + "K";
-	return amount.toString();
+    if (amount >= 1e33) return (amount / 1e33).toFixed(2) + "𝐃𝐂";
+    if (amount >= 1e30) return (amount / 1e30).toFixed(2) + "𝐍𝐎";
+    if (amount >= 1e27) return (amount / 1e27).toFixed(2) + "𝐎𝐂";
+    if (amount >= 1e24) return (amount / 1e24).toFixed(2) + "𝐒𝐏";
+    if (amount >= 1e21) return (amount / 1e21).toFixed(2) + "𝐒𝐗";
+    if (amount >= 1e18) return (amount / 1e18).toFixed(2) + "𝐐𝐍";
+    if (amount >= 1e15) return (amount / 1e15).toFixed(2) + "𝐐𝐃";
+    if (amount >= 1e12) return (amount / 1e12).toFixed(2) + "𝐓";
+    if (amount >= 1e9)  return (amount / 1e9).toFixed(2)  + "𝐁";
+    if (amount >= 1e6)  return (amount / 1e6).toFixed(2)  + "𝐌";
+    if (amount >= 1e3)  return (amount / 1e3).toFixed(2)  + "𝐊";
+    return amount.toString();
 }
 
-// Stylish bold font wrapper
 function stylish(text) {
-	return text.split("").map(c => {
-		const boldMap = {
-			"a":"𝗮","b":"𝗯","c":"𝗰","d":"𝗱","e":"𝗲","f":"𝗳","g":"𝗴","h":"𝗵","i":"𝗶","j":"𝗷","k":"𝗸","l":"𝗹","m":"𝗺","n":"𝗻","o":"𝗼","p":"𝗽","q":"𝗾","r":"𝗿","s":"𝘀","t":"𝘁","u":"𝘂","v":"𝘃","w":"𝘄","x":"𝘅","y":"𝘆","z":"𝘇",
-			"A":"𝗔","B":"𝗕","C":"𝗖","D":"𝗗","E":"𝗘","F":"𝗙","G":"𝗚","H":"𝗛","I":"𝗜","J":"𝗝","K":"𝗞","L":"𝗟","M":"𝗠","N":"𝗡","O":"𝗢","P":"𝗣","Q":"𝗤","R":"𝗥","S":"𝗦","T":"𝗧","U":"𝗨","V":"𝗩","W":"𝗪","X":"𝗫","Y":"𝗬","Z":"𝗭",
-			"0":"𝟬","1":"𝟭","2":"𝟮","3":"𝟯","4":"𝟰","5":"𝟱","6":"𝟲","7":"𝟳","8":"𝟴","9":"𝟵"
-		};
-		return boldMap[c] || c;
-	}).join("");
+    const serifBold = {
+        "a":"𝐚","b":"𝐛","c":"𝐜","d":"𝐝","e":"𝐞","f":"𝐟","g":"𝐠","h":"𝐡","i":"𝐢","j":"𝐣","k":"𝐤","l":"𝐥","m":"𝐦","n":"𝐧","o":"𝐨","p":"𝐩","q":"𝐪","r":"𝐫","s":"𝐬","t":"𝐭","u":"𝐮","v":"𝐯","w":"𝐰","x":"𝐱","y":"𝐲","z":"𝐳",
+        "A":"𝐀","B":"𝐁","C":"𝐂","D":"𝐃","E":"𝐄","F":"𝐅","G":"𝐆","H":"𝐇","I":"𝐈","J":"𝐉","K":"𝐊","L":"𝐋","M":"𝐌","N":"𝐍","O":"𝐎","P":"𝐏","Q":"𝐐","R":"𝐑","S":"𝐒","T":"𝐓","U":"𝐔","V":"𝐕","W":"𝐖","X":"𝐗","Y":"𝐘","Z":"𝐙",
+        "0":"𝟎","1":"𝟏","2":"𝟐","3":"𝟑","4":"𝟒","5":"𝟓","6":"𝟔","7":"𝟕","8":"𝟖","9":"𝟗"
+    };
+    return text.toString().split("").map(c => serifBold[c] || c).join("");
 }
 
 function getRankEmoji(rank) {
-	const emojis = ["👑","🥈","🥉","🔷","🔶","⭐","✨","▪️"];
-	if (rank === 1) return emojis[0];
-	if (rank === 2) return emojis[1];
-	if (rank === 3) return emojis[2];
-	if (rank <= 5) return emojis[3];
-	if (rank <= 10) return emojis[4];
-	if (rank <= 15) return emojis[5];
-	return emojis[6];
+    if (rank === 1) return "👑";
+    if (rank === 2) return "🥈";
+    if (rank === 3) return "🥉";
+    return "🔹";
 }
 
 module.exports = {
-	config: {
-		name: "top",
-		aliases: ["richlist"],
-		version: "Mikasa-3.1",
-		author: "Saif",
-		shortDescription: "💰 Top Money Leaderboard",
-		longDescription: "🏆 Displays users with highest balances in stylish bold font with mentions",
-		category: "bank",
-		guide: {
-			en: "{p}top [number]"
-		}
-	},
+    config: {
+        name: "top",
+        aliases: ["richlist", "leaderboard"],
+        version: "4.5",
+        author: "Tꫝᴍɪᴍ & Gemini",
+        shortDescription: "Top Money Leaderboard",
+        longDescription: "Shows the richest users on the global server list.",
+        category: "Economy",
+        guide: { en: "{p}top [10/50/100]" }
+    },
 
-	onStart: async function ({ api, event, usersData, args }) {
-		try {
-			const allUsers = await usersData.getAll();
-			const topCount = args[0] ? Math.min(parseInt(args[0]), 20) : 10;
+    onStart: async function({ api, event, usersData, args }) {
+        try {
+            const { threadID, senderID, messageID } = event;
+            const allUsers = await usersData.getAll();
 
-			const topUsers = allUsers
-				.filter(user => user.money !== undefined)
-				.sort((a, b) => b.money - a.money)
-				.slice(0, topCount);
+            const sortedUsers = allUsers
+                .filter(u => u.money !== undefined)
+                .sort((a, b) => b.money - a.money);
 
-			if (topUsers.length === 0) {
-				return api.sendMessage("❌ No users with money data found!", event.threadID);
-			}
+            const requested = parseInt(args[0]) || 10;
+            const topCount = Math.max(1, Math.min(requested, 500));
+            const topUsers = sortedUsers.slice(0, topCount);
 
-			let leaderboardMsg = `🏆 ${stylish("TOP")} ${stylish(topCount.toString())} ${stylish("RICHEST USERS")}\n━━━━━━━━━━━━━━━━━━\n\n`;
-			let mentions = [];
+            if (!topUsers.length)
+                return api.sendMessage(
+                    "❌ No data found!",
+                    threadID,
+                    null,
+                    messageID
+                );
 
-			topUsers.forEach((user, index) => {
-				const rank = index + 1;
-				const name = user.name || "Unknown User";
-				const money = stylish(formatMoney(user.money || 0));
-				const uid = user.userID || user.id;
+            let msg = `🏆 ${stylish("𝐓𝐎𝐏")} ${stylish(topCount)} ${stylish("𝐑𝐈𝐂𝐇𝐄𝐒𝐓 𝐔𝐒𝐄𝐑𝐒")}\n`;
+            msg += `━━━━━━━━━━━━━━━━━━\n\n`;
 
-				leaderboardMsg += `${getRankEmoji(rank)} ${stylish("Rank")} ${stylish(rank.toString())}: ${stylish(name)}\n💰 ${stylish("Balance")}: ${money}\n\n`;
+            let mentions = [];
+            topUsers.forEach((user, i) => {
+                const rank = i + 1;
+                const name = user.name || "Unknown";
+                const balance = formatMoney(user.money || 0);
+                const uid = user.userID || user.id;
 
-				if (uid) mentions.push({ tag: name, id: uid });
-			});
+                msg += `${getRankEmoji(rank)} ${stylish("𝐑𝐚𝐧𝐤")} ${stylish(rank)}: ${stylish(name)}\n`;
+                msg += `💸 ${stylish("𝐁𝐚𝐥𝐚𝐧𝐜𝐞")}: ${stylish(balance)}\n\n`;
 
-			leaderboardMsg += `━━━━━━━━━━━━━━━━━━\n💡 Use {p}top 5 for top 5 or {p}top 20 for top 20`;
+                if (uid) mentions.push({ tag: name, id: uid });
+            });
 
-			api.sendMessage({ body: leaderboardMsg, mentions }, event.threadID);
+            const userRank =
+                sortedUsers.findIndex(u => (u.userID || u.id) == senderID) + 1;
+            const userMoney =
+                sortedUsers.find(u => (u.userID || u.id) == senderID)?.money || 0;
 
-		} catch (error) {
-			console.error("❌ Top Command Error:", error);
-			api.sendMessage("⚠️ Failed to fetch leaderboard. Please try again later.", event.threadID);
-		}
-	}
+            msg += `━━━━━━━━━━━━━━━━━━\n`;
+            msg += `👤 ${stylish("𝐘𝐎𝐔𝐑 𝐑𝐀𝐍𝐊")}: ${userRank > 0 ? stylish(userRank) : "𝐍/𝐀"}\n`;
+            msg += `💰 ${stylish("𝐘𝐎𝐔𝐑 𝐁𝐀𝐋𝐀𝐍𝐂𝐄")}: ${stylish(formatMoney(userMoney))}\n`;
+            msg += `━━━━━━━━━━━━━━━━━━\n`;
+            msg += `💡 ${stylish("𝐔𝐬𝐞 {𝐩}𝐭𝐨𝐩 𝟓𝟎 | 𝟏𝟎𝟎 | 𝟓𝟎𝟎")}`;
+
+            api.sendMessage(
+                { body: msg, mentions },
+                threadID,
+                null,
+                messageID
+            );
+
+        } catch (err) {
+            console.error(err);
+            api.sendMessage(
+                "⚠️ Error loading leaderboard.",
+                event.threadID,
+                null,
+                event.messageID
+            );
+        }
+    }
 };
