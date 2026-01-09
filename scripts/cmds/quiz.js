@@ -1,174 +1,142 @@
 const axios = require("axios");
-const sessions = {};
-const stats = {};
-const cooldowns = {};
+
+// Global stats object (বট চলাকালীন ডাটা থাকবে)
+if (!global.quizStats) {
+  global.quizStats = {};
+}
+
+const sessions = new Map();
+const cooldowns = new Map();
 
 const QUIZ_URL = "https://raw.githubusercontent.com/SAIFUL-404-ST/quiz-api/main/quizzes.json";
 
 module.exports = {
   config: {
     name: "quiz",
-    aliases: ["qz", "quizlist", "qzlist"],
-    version: "3.2",
+    aliases: ["qz", "qzlist", "quizlist"],
+    version: "6.5",
     author: "Saif",
-    countDown: 10,
+    countDown: 5,
     role: 0,
     category: "game",
     guide: {
-      en: "{pn} quiz/qz → start quiz\n{pn} quizlist/qzlist → show stats"
-    }
-  },
-
-  // 📌 Helper: Load quizzes from raw
-  loadQuizzes: async function () {
-    try {
-      const res = await axios.get(QUIZ_URL);
-      return res.data;
-    } catch (e) {
-      console.error("❌ Failed to fetch quizzes:", e.message);
-      return [];
+      en: "{pn} -> Start quiz\n{pn} list -> Show rankings"
     }
   },
 
   onStart: async function ({ api, event, usersData, args }) {
-    const userId = event.senderID;
+    const { threadID, messageID, senderID } = event;
     const now = Date.now();
-    const input = args[0]?.toLowerCase() || "quiz";
 
-    // Stats list (sorted rankings)
-    if (input === "quizlist" || input === "qzlist") {
-      if (Object.keys(stats).length === 0)
-        return api.sendMessage("কেউ এখনও quiz খেলেনি।", event.threadID, event.messageID);
+    // 📊 Fixed Ranking List
+    if (args[0] === "list" || args[0] === "rank") {
+      const entries = Object.entries(global.quizStats);
+      if (entries.length === 0) return api.sendMessage("No one has played the quiz yet Baby 🥹", threadID, messageID);
 
-      // Convert stats object to array and sort by: won desc, then played desc
-      const entries = Object.entries(stats);
-      entries.sort((a, b) => {
-        const aWon = a[1].won || 0;
-        const bWon = b[1].won || 0;
-        if (bWon !== aWon) return bWon - aWon;
-        const aPlayed = a[1].played || 0;
-        const bPlayed = b[1].played || 0;
-        return bPlayed - aPlayed;
+      // Sorting by Won count (Descending)
+      entries.sort((a, b) => b[1].won - a[1].won);
+      
+      let listMsg = "📊 𝑸𝑼𝑰𝒀 𝑹𝑨𝑵𝑲𝑰𝑵𝑮𝑺\n" + "⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n";
+      
+      for (let i = 0; i < Math.min(entries.length, 10); i++) {
+        const [uid, st] = entries[i];
+        const name = await usersData.getName(uid) || "Baby";
+        listMsg += `${i + 1}. ${name} — 🏆 ${st.won} (🎮 ${st.played})\n`;
+      }
+      return api.sendMessage(listMsg, threadID, messageID);
+    }
+
+    // Cooldown Check
+    if (cooldowns.has(senderID) && now - cooldowns.get(senderID) < 5000) return;
+    cooldowns.set(senderID, now);
+
+    try {
+      const res = await axios.get(QUIZ_URL);
+      const quizzes = res.data;
+      const randomQuiz = quizzes[Math.floor(Math.random() * quizzes.length)];
+      const q = randomQuiz.questions[Math.floor(Math.random() * randomQuiz.questions.length)];
+
+      let optionsMsg = "";
+      ["a", "b", "c", "d"].forEach(l => {
+        if (q.options[l]) optionsMsg += `\n${l.toUpperCase()}. ${q.options[l]}`;
       });
 
-      // Fetch names in parallel and build lines with rank
-      const lines = await Promise.all(
-        entries.map(async ([uid, st], idx) => {
-          let name = uid;
-          try {
-            const fetchedName = await usersData.getName(uid);
-            if (fetchedName) name = fetchedName;
-          } catch (e) {
-            // ignore, fallback to uid
-          }
-          return `• ${idx + 1}. ${name}: Won ${st.won || 0}, Played ${st.played || 0}`;
-        })
-      );
+      const quizMsg = `╔═══════════════╗\n      𝑸 𝑼 𝑰 𝒁\n╚═══════════════╝\n\n${q.text}\n${optionsMsg}\n\n𝑹𝒆𝒑𝒍𝒚 → 𝒂𝒏𝒔𝒘𝒆𝒓 <𝒂|𝒃|𝒄|𝒅>`;
 
-      const txt = "📊 Quiz Rankings:\n" + lines.join("\n");
-      return api.sendMessage(txt, event.threadID, event.messageID);
-    }
+      api.sendMessage(quizMsg, threadID, (err, info) => {
+        if (err) return;
 
-    // Cooldown 5 sec
-    if (cooldowns[userId] && now - cooldowns[userId] < 5000)
-      return api.sendMessage("⏱ 5 সেকেন্ড cooldown আছে।", event.threadID, event.messageID);
-    cooldowns[userId] = now;
-
-    // User stats init
-    if (!stats[userId]) stats[userId] = { played: 0, won: 0, lastReset: now };
-    const userStats = stats[userId];
-
-    // Reset 12 hours
-    if (now - userStats.lastReset >= 12 * 60 * 60 * 1000) {
-      userStats.played = 0;
-      userStats.won = 0;
-      userStats.lastReset = now;
-    }
-
-    if (userStats.played >= 15)
-      return api.sendMessage("❌ আজকের limit শেষ, 12 ঘন্টা পরে আবার চেষ্টা করো।", event.threadID, event.messageID);
-
-    // 🔽 Load quizzes directly from raw
-    const quizzes = await this.loadQuizzes();
-    if (quizzes.length === 0) return api.sendMessage("❌ কোন quiz data লোড হয়নি।", event.threadID, event.messageID);
-
-    // Random quiz & question
-    const randomQuiz = quizzes[Math.floor(Math.random() * quizzes.length)];
-    const question = randomQuiz.questions[Math.floor(Math.random() * randomQuiz.questions.length)];
-
-    sessions[userId] = { quizId: randomQuiz.id, question, startTime: now };
-    userStats.played += 1;
-
-    let msg = `🎯 Quiz: ${randomQuiz.title}\n\n${question.text}\n`;
-    ["a", "b", "c", "d"].forEach((l) => {
-      if (question.options[l]) msg += `\n${l}. ${question.options[l]}`;
-    });
-    msg += `\n\nReply with: answer <a|b|c|d>`;
-
-    api.sendMessage(
-      msg,
-      event.threadID,
-      (error, info) => {
-        if (error) return console.error(error);
-        global.GoatBot.onReply.set(info.messageID, {
-          type: "reply",
-          commandName: this.config.name,
-          author: userId,
-          messageID: info.messageID,
-          correctAnswer: question.answer
+        sessions.set(senderID, { 
+          correctAnswer: q.answer.toLowerCase(), 
+          messageID: info.messageID 
         });
 
-        // Auto delete 60 sec
+        // Initialize user stats in global object
+        if (!global.quizStats[senderID]) {
+          global.quizStats[senderID] = { played: 0, won: 0 };
+        }
+        global.quizStats[senderID].played += 1;
+
+        global.GoatBot.onReply.set(info.messageID, {
+          commandName: this.config.name,
+          author: senderID,
+          messageID: info.messageID
+        });
+
+        // 1 Minute Silent Auto Delete
         setTimeout(() => {
-          if (sessions[userId] && sessions[userId].quizId === randomQuiz.id) {
-            delete sessions[userId];
-            api.sendMessage("⏰ Quiz সময় শেষ, session auto delete হয়েছে।", event.threadID);
+          if (sessions.has(senderID)) {
+            api.unsendMessage(info.messageID);
+            sessions.delete(senderID);
           }
         }, 60000);
-      },
-      event.messageID
-    );
+      }, messageID);
+
+    } catch (e) {
+      console.error(e);
+    }
   },
 
   onReply: async function ({ event, api, Reply, usersData }) {
-    const { correctAnswer, author } = Reply;
-    if (event.senderID !== author)
-      return api.sendMessage("❌ This is not your quiz!", event.threadID, event.messageID);
+    const { senderID, body, threadID, messageID } = event;
+    const { author, messageID: quizMsgID } = Reply;
 
-    const userId = author;
-    const userReply = event.body.trim().toLowerCase();
+    if (senderID !== author) {
+      return api.sendMessage("𝑻𝒉𝒊𝒔 𝒊𝒔 𝒏𝒐𝒕 𝒚𝒐𝒖𝒓 𝒒𝒖𝒊𝒛 𝑩𝒂𝒃𝒚 🐸", threadID, messageID);
+    }
 
-    if (!sessions[userId])
-      return api.sendMessage("❌ Quiz session expired!", event.threadID, event.messageID);
+    const session = sessions.get(senderID);
+    if (!session) return;
 
-    api.unsendMessage(Reply.messageID);
-    delete sessions[userId];
+    let userAnswer = body.trim().toLowerCase();
+    if (userAnswer.startsWith("answer ")) {
+      userAnswer = userAnswer.replace("answer ", "").trim();
+    }
 
-    if (userReply === correctAnswer.toLowerCase()) {
+    // Unsend user reply to keep chat clean
+    api.unsendMessage(messageID);
+    sessions.delete(senderID);
+
+    if (userAnswer === session.correctAnswer) {
       const rewardCoins = 500;
       const rewardExp = 121;
-
-      const userData = await usersData.get(userId);
-      await usersData.set(userId, {
+      
+      const userData = await usersData.get(senderID);
+      await usersData.set(senderID, { 
         money: (userData.money || 0) + rewardCoins,
-        exp: (userData.exp || 0) + rewardExp,
-        data: userData.data || {}
+        exp: (userData.exp || 0) + rewardExp
       });
 
-      if (!stats[userId]) stats[userId] = { played: 1, won: 1, lastReset: Date.now() };
-      else stats[userId].won += 1;
+      // Update global stats
+      if (global.quizStats[senderID]) {
+        global.quizStats[senderID].won += 1;
+      }
 
-      return api.sendMessage(
-        `✅ Correct answer!\nYou earned ${rewardCoins} coins & ${rewardExp} exp.`,
-        event.threadID,
-        event.messageID
-      );
+      const successMsg = `𝑩𝒂𝒃𝒚 𝑪𝒐𝒓𝒓𝒆𝒄𝒕 𝒂𝒏𝒔\n✨ 𝒀𝒐𝒖 𝒘𝒐𝒏 ${rewardCoins} 𝒄𝒐𝒊𝒏𝒔 𝒂𝒏𝒅 ${rewardExp} 𝒆𝒙𝒑`;
+      return api.editMessage(successMsg, quizMsgID);
     } else {
-      return api.sendMessage(
-        `❌ Wrong answer!\nCorrect answer was: ${correctAnswer}`,
-        event.threadID,
-        event.messageID
-      );
+      const failMsg = `𝑾𝒓𝒐𝒏𝒈 𝒂𝒏𝒔𝒘𝒆𝒓 𝒃𝒂𝒃𝒚 🥹\n📖 𝑪𝒐𝒓𝒓𝒆𝒄𝒕 𝒘𝒂𝒔 ${session.correctAnswer.toUpperCase()}`;
+      return api.editMessage(failMsg, quizMsgID);
     }
   }
 };
