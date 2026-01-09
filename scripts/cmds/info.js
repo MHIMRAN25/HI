@@ -24,9 +24,9 @@ module.exports = {
     const status = "Broken";
 
     const urls = [
-      "https://i.imgur.com/YRGXJij.mp4",
-      "https://i.imgur.com/YRGXJij.mp4",
-      "https://i.imgur.com/YRGXJij.mp4",
+      "https://files.catbox.moe/3dq5a2.mp4",
+      "https://files.catbox.moe/3dq5a2.mp4",
+      "https://files.catbox.moe/3dq5a2.mp4",
       "https://files.catbox.moe/ree9su.mp4"
     ];
     const link = urls[Math.floor(Math.random() * urls.length)];
