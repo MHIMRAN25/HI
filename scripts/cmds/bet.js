@@ -13,52 +13,61 @@ const parseAmount = (str) => {
   return isNaN(num) ? NaN : num * multiplier;
 };
 
-const smallBoldNumbers = {
-  "0": "𝟎", "1": "𝟏", "2": "𝟐", "3": "𝟑", "4": "𝟒",
-  "5": "𝟓", "6": "𝟔", "7": "𝟕", "8": "𝟖", "9": "𝟗", ".": "."
+const toBoldSerifItalic = (text) => {
+  const fonts = {
+    'a': '𝒂','b': '𝒃','c': '𝒄','d': '𝒅','e': '𝒆','f': '𝒇','g': '𝒈',
+    'h': '𝒉','i': '𝒊','j': '𝒋','k': '𝒌','l': '𝒍','m': '𝒎','n': '𝒏',
+    'o': '𝒐','p': '𝒑','q': '𝗊','r': '𝒓','s': '𝒔','t': '𝒕','u': '𝒖',
+    'v': '𝒗','w': '𝒘','x': '𝒙','y': '𝒚','z': '𝒛',
+    'A': '𝑨','B': '𝑩','C': '𝑪','D': '𝑫','E': '𝑬','F': '𝑭','G': '𝑮',
+    'H': '𝑯','I': '𝑰','J': '𝑱','K': '𝑲','L': '𝑳','M': '𝑴','N': '𝑵',
+    'O': '𝑶','P': '𝑷','Q': '𝑸','R': '𝑹','S': '𝑺','T': '𝑻','U': '𝑼',
+    'V': '𝑽','W': '𝒘','X': '𝒙','Y': '𝒀','Z': '𝒁',
+    '0': '𝟎','1': '𝟏','2': '𝟐','3': '𝟑','4': '𝟒',
+    '5': '𝟓','6': '𝟔','7': '𝟕','8': '𝟖','9': '𝟗', '.': '.'
+  };
+  return text.split('').map(char => fonts[char] || char).join('');
 };
-
-function toSmallBoldNumber(num) {
-  return num.toString().split("").map(c => smallBoldNumbers[c] || c).join("");
-}
 
 function formatMoney(num) {
   const suffixes = [
-    { value: 1e33, symbol: "𝐃𝐂" },
-    { value: 1e30, symbol: "𝐍𝐎" },
-    { value: 1e27, symbol: "𝐎𝐂" },
-    { value: 1e24, symbol: "𝐒𝐏" },
-    { value: 1e21, symbol: "𝐒𝐗" },
-    { value: 1e18, symbol: "𝐐𝐍" },
-    { value: 1e15, symbol: "𝐐𝐃" },
-    { value: 1e12, symbol: "𝐓" },
-    { value: 1e9, symbol: "𝐁" },
-    { value: 1e6, symbol: "𝐌" },
-    { value: 1e3, symbol: "𝐊" }
+    { value: 1e33, symbol: "𝑫𝑪" },
+    { value: 1e30, symbol: "𝑵𝑶" },
+    { value: 1e27, symbol: "𝑶𝑪" },
+    { value: 1e24, symbol: "𝑺𝑷" },
+    { value: 1e21, symbol: "𝑺𝑿" },
+    { value: 1e18, symbol: "𝑸𝑰" },
+    { value: 1e15, symbol: "𝑸𝑫" },
+    { value: 1e12, symbol: "𝑻" },
+    { value: 1e9,  symbol: "𝑩" },
+    { value: 1e6,  symbol: "𝑴" },
+    { value: 1e3,  symbol: "𝑲" }
   ];
   for (const s of suffixes) {
     if (num >= s.value) {
-      return toSmallBoldNumber((num / s.value).toFixed(2)) + s.symbol;
+      return toBoldSerifItalic((num / s.value).toFixed(2)) + s.symbol;
     }
   }
-  return toSmallBoldNumber(num);
+  return toBoldSerifItalic(num.toString());
 }
 
-const emojis = ["❤️", "💙", "💚", "💛"];
-const cooldowns = new Map(); // 15 sec cooldown
-const dailyUsage = new Map(); // daily limit 20
+const emojis = ["❤️", "💙", "💚", "💛", "💜", "🧡"];
+const dailyUsage = new Map();
 
 module.exports = {
   config: {
     name: "bet",
-    version: "5.4",
+    version: "5.5",
     author: "Saif",
     category: "game",
-    countDown: 15
+    countDown: 15,
+    shortDescription: "🎰 𝑼𝑳𝑻𝑹𝑨-𝑺𝑻𝑨𝑩𝑳𝑬 𝑩𝑬𝑻 𝑮𝑨𝑴𝑬",
+    guide: { en: "{p}bet <amount>" }
   },
 
-  onStart: async function ({ args, message, event, usersData }) {
-    const user = event.senderID;
+  onStart: async function ({ api, event, args, usersData }) {
+    const { senderID, threadID, messageID } = event;
+    const user = senderID;
 
     // Daily reset logic
     const today = new Date().toDateString();
@@ -66,50 +75,63 @@ module.exports = {
       dailyUsage.set(user, { count: 0, date: today });
     }
     const userDaily = dailyUsage.get(user);
-    if (userDaily.count >= 20) return message.reply("⚠️ You have reached your daily limit of 20 bets! Come back tomorrow~ 🫠");
-
-    // Cooldown check
-    const now = Date.now();
-    if (cooldowns.has(user) && now - cooldowns.get(user) < 15000) {
-      const remaining = Math.ceil((15000 - (now - cooldowns.get(user))) / 1000);
-      return message.reply(`⏳ Please wait ${remaining} more seconds before betting again.`);
+    if (userDaily.count >= 20) {
+        return api.sendMessage(toBoldSerifItalic("⚠️ 𝒀𝑶𝑼 𝑯𝑨𝑽𝑬 𝑹𝑬𝑨𝑪𝑯𝑬𝑫 𝒀𝑶𝑼𝑹 𝑫𝑨𝑰𝑳𝒀 𝑳𝑰𝑴𝑰𝑻 𝑶𝑭 𝟐𝟎 𝑩𝑬𝑻𝑺!"), threadID, messageID);
     }
 
-    const userData = await usersData.get(user) || { money: 0, data: {} };
-    const amount = parseAmount(args[0]);
-    if (isNaN(amount) || amount <= 0) return message.reply("⚠️ 𝐄𝐍𝐓𝐄𝐑 𝐀 𝐕𝐀𝐋𝐈𝐃 𝐀𝐌𝐎𝐔𝐍𝐓.");
-    if (amount > userData.money) return message.reply("💰 𝐍𝐎𝐓 𝐄𝐍𝐎𝐔𝐆𝐇 𝐁𝐀𝐋𝐀𝐍𝐂𝐄.");
+    let betAmount = parseAmount(args[0]);
+    if (!betAmount || betAmount <= 0) {
+      return api.sendMessage(
+        toBoldSerifItalic("❌ 𝑰𝑵𝑽𝑨𝑳𝑰𝑫 𝑩𝑬𝑻 𝑨𝑴𝑶𝑼𝑵𝑻! 𝑼𝑺𝑨𝑮𝑬: bet 500"),
+        threadID,
+        messageID
+      );
+    }
 
-    const isWin = Math.random() < 0.55;
+    const userData = await usersData.get(user);
+    if (!userData || userData.money < betAmount) {
+      return api.sendMessage(
+        toBoldSerifItalic("💰 𝑰𝑵𝑺𝑼𝑭𝑭𝑰𝑪𝑰𝑬𝑵𝑻 𝑩𝑨𝑳𝑨𝑵𝑪𝑬! 𝒀𝑶𝑼 𝑯𝑨𝑽𝑬: ") + formatMoney(userData?.money || 0),
+        threadID,
+        messageID
+      );
+    }
+
     const userEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+    const loadingMsg = await api.sendMessage(
+      toBoldSerifItalic("🎰 𝑩𝑬𝑻𝑻𝑰𝑵𝑮 𝑶𝑵 ") + userEmoji + toBoldSerifItalic(" 𝑩𝑨𝑩𝒀... 🎀\n💵 𝑨𝑴𝑶𝑼𝑵𝑻: ") + formatMoney(betAmount),
+      threadID,
+      messageID
+    );
+
+    await new Promise(r => setTimeout(r, 2000));
+
+    // 50/50 Win Chance
+    const isWin = Math.random() < 0.50;
     const winEmoji = isWin ? userEmoji : "🖤";
-
-    await message.reply(`🎰 𝐁𝐄𝐓𝐓𝐈𝐍𝐆 𝐎𝐍 ${userEmoji}...`);
-    await new Promise(r => setTimeout(r, 1500));
-
-    const change = isWin ? amount : -amount;
+    const change = isWin ? betAmount : -betAmount;
     const newBalance = userData.money + change;
-    await usersData.set(user, { money: newBalance, data: userData.data });
 
-    // Update cooldown and daily usage
-    cooldowns.set(user, now);
+    await usersData.set(user, { money: newBalance });
     userDaily.count += 1;
     dailyUsage.set(user, userDaily);
 
-    const result = isWin
-      ? ` 𝐘𝐎𝐔 𝐖𝐎𝐍 ${formatMoney(amount)}!`
-      : ` 𝐘𝐎𝐔 𝐋𝐎𝐒𝐓 ${formatMoney(amount)}.`;
+    let resultText = isWin 
+      ? toBoldSerifItalic("✅ 𝒀𝑶𝑼 𝑾𝑶𝑵: ") + formatMoney(betAmount) 
+      : toBoldSerifItalic("❌ 𝒀𝑶𝑼 𝑳𝑶𝑺𝑻: ") + formatMoney(betAmount);
 
-    const output = `
-𝐘𝐎𝐔𝐑 𝐄𝐌𝐎𝐉𝐈: ${userEmoji}
-𝐖𝐈𝐍𝐍𝐈𝐍𝐆 𝐄𝐌𝐎𝐉𝐈: ${winEmoji}
+    const finalResult = `
+🎰 ${toBoldSerifItalic("𝑩𝑬𝑻 𝑹𝑬𝑺𝑼𝑳𝑻 𝑩𝑨𝑩𝒀")}
 
-${result}
+${toBoldSerifItalic("𝒀𝑶𝑼𝑹 𝑬𝑴𝑶𝑱𝑰:")} ${userEmoji}
+${toBoldSerifItalic("𝑾𝑰𝑵𝑵𝑰𝑵𝑮 𝑬𝑴𝑶𝑱𝑰:")} ${winEmoji}
 
-𝐁𝐀𝐋𝐀𝐍𝐂𝐄: ${formatMoney(newBalance)}
-• 𝐃𝐚𝐢𝐥𝐲 𝐔𝐬𝐞: ${userDaily.count}/20
-`;
+${resultText}
 
-    return message.reply(output.trim());
+💰 ${toBoldSerifItalic("𝑵𝑬𝑾 𝑩𝑨𝑳𝑨𝑵𝑪𝑬:")} ${formatMoney(newBalance)}
+📈 ${toBoldSerifItalic("𝑫𝑨𝑰𝑳𝒀 𝑼𝑺𝑬:")} ${toBoldSerifItalic(userDaily.count.toString())}/𝟐𝟎
+    `.trim();
+
+    return api.editMessage(finalResult, loadingMsg.messageID);
   }
 };
