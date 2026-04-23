@@ -3,6 +3,7 @@ name: Node.js CI
 on:
   push:
     branches: [ "main" ]
+  workflow_dispatch:  # এই লাইনটি যোগ করলে ম্যানুয়ালি রান করা যাবে
 
 jobs:
   build:
@@ -13,4 +14,4 @@ jobs:
       uses: actions/setup-node@v3
       with:
         node-version: '16'
-    - run: npm install
+    - run: npm installami 
