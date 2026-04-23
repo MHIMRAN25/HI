@@ -1,17 +1,23 @@
-name: Node.js CI
+name: Node.js Bot Action
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:  # এই লাইনটি যোগ করলে ম্যানুয়ালি রান করা যাবে
+  workflow_dispatch: # এটি যোগ করলে আপনি গিটহাব থেকে ম্যানুয়ালি রান করতে পারবেন
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '16'
-    - run: npm installami 
+      - uses: actions/checkout@v3
+      
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Start Bot
+        run: npm start
