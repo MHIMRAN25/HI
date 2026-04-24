@@ -1,23 +1,29 @@
-name: Node.js Bot Action
+name: saif
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch: # এটি যোগ করলে আপনি গিটহাব থেকে ম্যানুয়ালি রান করতে পারবেন
-
+    branches: [ saif ]
+  pull_request:
+    branches: [ saif ]
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [20.x]
+
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Use Node.js
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
-          
+          node-version: ${{ matrix.node-version }}
+
       - name: Install dependencies
         run: npm install
-        
-      - name: Start Bot
+
+      - name: Start app
         run: npm start
